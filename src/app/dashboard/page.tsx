@@ -30,15 +30,12 @@ export default function Dashboard() {
     fetchRecordings()
   }, [])
 
-  async function fetchRecordings() {
-    const { data, error } = await supabase
-      .from('recordings')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (!error && data) setRecordings(data)
-    setLoading(false)
-  }
+async function fetchRecordings() {
+  const res = await fetch('/api/recordings')
+  const data = await res.json()
+  if (data.recordings) setRecordings(data.recordings)
+  setLoading(false)
+}
 
   const filtered = filter === 'all'
     ? recordings
