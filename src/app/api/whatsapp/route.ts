@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 import { transcribeAudio } from '@/lib/whisper'
 import { classifyRecording } from '@/lib/classify'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'

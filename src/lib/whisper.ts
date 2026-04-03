@@ -1,5 +1,4 @@
 import OpenAI from 'openai'
-import { Readable } from 'stream'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!
@@ -9,13 +8,15 @@ export async function transcribeAudio(
   audioBuffer: Buffer,
   filename: string
 ): Promise<{ text: string; language: string }> {
-  // Convert buffer to a File object that OpenAI accepts
-  const file = new File([audioBuffer], filename, { type: 'audio/ogg' })
+  // Convert Buffer to Uint8Array to satisfy TypeScript
+  const uint8Array = new Uint8Array(audioBuffer)
+  const blob = new Blob([uint8Array], { type: 'audio/ogg' })
+  const file = new File([blob], filename, { type: 'audio/ogg' })
 
   const response = await openai.audio.transcriptions.create({
     file,
     model: 'whisper-1',
-    response_format: 'verbose_json' // gives us language detection
+    response_format: 'verbose_json'
   })
 
   return {
