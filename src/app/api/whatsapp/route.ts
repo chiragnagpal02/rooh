@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Upload audio to Supabase storage
-    const filename = `${family.id}/${Date.now()}.ogg`
+    const filename = '${family.id}/${Date.now()}.ogg'
     const { data: uploadData, error: uploadError } = await supabaseAdmin
       .storage
       .from('recordings')
@@ -116,11 +116,11 @@ export async function POST(req: NextRequest) {
     if (classification.followup_prompt) {
       await sendWhatsAppMessage(
         from,
-        `One follow-up question when you have a moment:\n\n${classification.followup_prompt}`
+        'One follow-up question when you have a moment:\n\n${classification.followup_prompt}'
       )
     }
 
-    console.log(`✓ Recording saved for family ${family.id} — type: ${classification.primary_type}`)
+    console.log('✓ Recording saved for family ${family.id} — type: ${classification.primary_type}')
     return NextResponse.json({ status: 'success', recording_id: recording.id })
 
   } catch (err) {
@@ -137,7 +137,7 @@ async function downloadWhatsAppAudio(audioId: string): Promise<Buffer | null> {
   try {
     // Get the download URL
     const metaRes = await fetch(
-      `https://waba.360dialog.io/v1/media/${audioId}`,
+      'https://waba.360dialog.io/v1/media/${audioId}',
       { headers: { 'D360-API-KEY': apiKey } }
     )
     const meta = await metaRes.json()
@@ -160,5 +160,12 @@ function getConfirmationMessage(parentName: string, type: string): string {
   const name = parentName.split(' ')[0]
 
   const messages: Record<string, string> = {
-    story: `Thank you ${name} 🙏 Your memory has been saved safely. Your family will treasure this.`,
-    practical: `Thank you ${name}. That important
+    story: 'Thank you ' + name + ' \uD83D\uDE4F Your memory has been saved safely. Your family will treasure this.',
+    practical: 'Thank you ' + name + '. That important information has been saved for your family.',
+    legacy: 'Thank you ' + name + ' \uD83D\uDE4F Your message has been saved with care, in your exact words.',
+    mixed: 'Thank you ' + name + ' \uD83D\uDE4F Your recording has been saved safely for your family.',
+    untagged: 'Thank you ' + name + '. Your recording has been saved.'
+  }
+
+  return messages[type] || messages.untagged
+}
