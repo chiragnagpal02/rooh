@@ -1,3 +1,7 @@
+'use client'
+
+import posthog from 'posthog-js'
+
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-white">
@@ -9,6 +13,7 @@ export default function Home() {
         </p>
         <a
           href="/dashboard"
+          onClick={() => posthog.capture('archive_opened')}
           className="inline-block bg-emerald-600 text-white px-8 py-3 rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
         >
           Open archive

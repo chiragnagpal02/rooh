@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Recording, RecordingType } from "@/types";
+import posthog from "posthog-js";
 
 const TYPE_LABELS: Record<RecordingType, string> = {
   story: "Life story",
@@ -91,7 +92,10 @@ export default function Dashboard() {
           {(["all", "story", "practical", "legacy"] as const).map((f) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => {
+                setFilter(f);
+                posthog.capture('recording_filter_changed', { filter: f });
+              }}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                 filter === f
                   ? "bg-gray-900 text-white border-gray-900"
@@ -125,9 +129,17 @@ export default function Dashboard() {
                 {/* Card header */}
                 <button
                   className="w-full text-left p-4"
-                  onClick={() =>
-                    setExpanded(expanded === recording.id ? null : recording.id)
-                  }
+                  onClick={() => {
+                    const isExpanding = expanded !== recording.id;
+                    setExpanded(isExpanding ? recording.id : null);
+                    if (isExpanding) {
+                      posthog.capture('recording_expanded', {
+                        recording_id: recording.id,
+                        recording_type: recording.primary_type,
+                        language: recording.language_detected,
+                      });
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">

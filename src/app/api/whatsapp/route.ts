@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { transcribeAudio } from '@/lib/whisper'
 import { classifyRecording } from '@/lib/classify'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 // 360dialog sends a GET request to verify your webhook
 export async function GET(req: NextRequest) {
@@ -47,6 +48,17 @@ export async function POST(req: NextRequest) {
       console.error('Unknown parent number:', from)
       return NextResponse.json({ status: 'unknown_parent' })
     }
+
+    // Track that a WhatsApp audio message was received
+    const posthog = getPostHogClient()
+    posthog.capture({
+      distinctId: family.id,
+      event: 'whatsapp_message_received',
+      properties: {
+        family_id: family.id,
+        message_type: 'audio',
+      },
+    })
 
     // 2. Download the audio file from WhatsApp
     const audioBuffer = await downloadWhatsAppAudio(audioId)
@@ -104,6 +116,20 @@ export async function POST(req: NextRequest) {
       console.error('DB insert error:', recordingError)
       return NextResponse.json({ status: 'db_error' })
     }
+
+    // Track the successful recording save
+    posthog.capture({
+      distinctId: family.id,
+      event: 'recording_saved',
+      properties: {
+        recording_id: recording.id,
+        family_id: family.id,
+        primary_type: classification.primary_type,
+        language_detected: language,
+        classification_confidence: classification.confidence,
+        needs_review: classification.needs_review,
+      },
+    })
 
     // 8. Send confirmation back to parent on WhatsApp
     const confirmationMessage = getConfirmationMessage(

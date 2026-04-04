@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { classifyRecording } from '@/lib/classify'
+import { getPostHogClient } from '@/lib/posthog-server'
 
 // This simulates what happens when a parent sends a voice note
 // We skip the audio step and feed a transcript directly
@@ -44,6 +45,20 @@ export async function POST(req: NextRequest) {
       console.error('DB error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    // Track the test recording submission
+    const posthog = getPostHogClient()
+    posthog.capture({
+      distinctId: family_id,
+      event: 'test_recording_submitted',
+      properties: {
+        recording_id: recording.id,
+        family_id,
+        primary_type: classification.primary_type,
+        language: language || 'english',
+        classification_confidence: classification.confidence,
+      },
+    })
 
     return NextResponse.json({
       success: true,
