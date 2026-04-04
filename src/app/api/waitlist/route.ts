@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
     // Send welcome email
     await resend.emails.send({
-      from: 'Chirag at Rooh <onboarding@resend.dev>',
+      from: 'Chirag at Rooh <hello@rooh.family>',
       to: email,
       subject: "You're on the Rooh waitlist",
       html: `
