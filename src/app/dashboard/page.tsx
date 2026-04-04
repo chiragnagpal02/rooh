@@ -54,7 +54,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
+        <div>
           <h1 className="text-2xl font-medium text-gray-900">روح Rooh</h1>
           <p className="text-gray-500 text-sm mt-1">Your family archive</p>
         </div>
@@ -94,7 +94,7 @@ export default function Dashboard() {
               key={f}
               onClick={() => {
                 setFilter(f);
-                posthog.capture('recording_filter_changed', { filter: f });
+                posthog.capture("recording_filter_changed", { filter: f });
               }}
               className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
                 filter === f
@@ -133,7 +133,7 @@ export default function Dashboard() {
                     const isExpanding = expanded !== recording.id;
                     setExpanded(isExpanding ? recording.id : null);
                     if (isExpanding) {
-                      posthog.capture('recording_expanded', {
+                      posthog.capture("recording_expanded", {
                         recording_id: recording.id,
                         recording_type: recording.primary_type,
                         language: recording.language_detected,

@@ -399,8 +399,9 @@ export default function Home() {
             margin: 0,
           }}
         >
-          Do you know if they are facing any illness? Which medicines they take or who their doctor is?
-          If something happened tonight - would you know what to do?
+          Do you know if they are facing any illness? Which medicines they take
+          or who their doctor is? If something happened tonight - would you know
+          what to do?
         </p>
       </section>
 
@@ -892,6 +893,14 @@ export default function Home() {
         <p style={{ fontSize: "12px", color: "#D6CEC4", margin: 0 }}>
           2026 Rooh. Made with care in Singapore.
         </p>
+
+        {/* Footer — add after the copyright line */}
+        <a
+          href="/login"
+          style={{ fontSize: "12px", color: "#D6CEC4", textDecoration: "none" }}
+        >
+          Sign in
+        </a>
       </footer>
       {/* Back to top */}
       <button

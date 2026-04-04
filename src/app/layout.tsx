@@ -16,9 +16,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const isDev = process.env.NEXT_PUBLIC_ENV !== 'production'
+
   return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  )
+  <html lang="en" suppressHydrationWarning>
+    <body suppressHydrationWarning>
+      {isDev && (
+        <div style={{
+          background: '#1D9E75',
+          color: 'white',
+          textAlign: 'center',
+          padding: '4px',
+          fontSize: '12px',
+          fontWeight: 500,
+          letterSpacing: '0.05em'
+        }}>
+          DEV ENVIRONMENT — not production
+        </div>
+      )}
+      {children}
+    </body>
+  </html>
+)
 }
