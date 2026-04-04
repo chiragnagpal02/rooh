@@ -374,7 +374,7 @@ export default function Home() {
             margin: "0 0 32px",
           }}
         >
-          When did you last sit with your parents and really listen?
+          Are your parents happy? Not "fine" - actually happy?
         </p>
         <p
           className="fade-up fade-up-delay-1"
@@ -386,8 +386,8 @@ export default function Home() {
             margin: "0 0 32px",
           }}
         >
-          Do you know which insurance policies they have? Where the property
-          papers are? Who their doctor is?
+          Do you know what their childhood was like? What they sacrificed for
+          you? What they never told you about themselves?
         </p>
         <p
           className="fade-up fade-up-delay-2"
@@ -399,8 +399,8 @@ export default function Home() {
             margin: 0,
           }}
         >
-          Do you know the story of how they met? What their childhood home
-          looked like? What they want you to remember?
+          Do you know if they are facing any illness? Which medicines they take or who their doctor is?
+          If something happened tonight - would you know what to do?
         </p>
       </section>
 
