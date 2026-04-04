@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: 'Chirag at Rooh <hello@rooh.family>',
       to: email,
-      subject: "You're on the Rooh waitlist",
+      subject: "Welcome to Rooh, " + (name || 'friend'),
       html: `
         <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; padding: 40px 20px; color: #1C1917;">
           <p style="font-size: 22px; font-weight: 600; margin: 0 0 24px;">Rooh</p>
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
           
           <p style="font-size: 16px; line-height: 1.7; margin: 0 0 16px;">
             You are among the first people who believe that our parents' stories, 
-            memories, and everything they carry deserve to be kept safe — not 
+            memories, and everything they carry deserve to be kept safe - not 
             lost quietly with time.
           </p>
 
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
           </p>
 
           <p style="font-size: 16px; line-height: 1.7; margin: 0 0 32px;">
-            In the meantime — call your parents.
+            In the meantime - call your parents.
           </p>
 
           <p style="font-size: 16px; line-height: 1.7; margin: 0;">
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
           <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 32px 0;">
           <p style="font-size: 12px; color: #9CA3AF;">
-            Rooh — The soul of your family, always with you.
+            Rooh - The soul of your family, always with you.
           </p>
         </div>
       `
