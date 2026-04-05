@@ -47,33 +47,49 @@ export default function OnboardingPage() {
     router.push('/login')
   }
 
-  async function handleFinish() {
-    if (!adultName || !parentName || !parentWhatsapp) return
-    setLoading(true)
-    setError('')
+async function handleFinish() {
+  if (!adultName || !parentName || !parentWhatsapp) return
+  setLoading(true)
+  setError('')
 
-    try {
-      const { error: insertError } = await supabase
-        .from('families')
-        .insert({
-          adult_child_email: userEmail,
-          adult_child_name: adultName,
-          parent_name: parentName,
-          parent_whatsapp: parentWhatsapp.replace(/\s/g, ''),
-        })
+  try {
+    const { data: newFamily, error: insertError } = await supabase
+      .from('families')
+      .insert({
+        adult_child_email: userEmail,
+        adult_child_name: adultName,
+        parent_name: parentName,
+        parent_whatsapp: parentWhatsapp.replace(/\s/g, '').replace('+', ''),
+      })
+      .select()
+      .single()
 
-      if (insertError) {
+    if (insertError) {
+      console.error('Insert error:', insertError)
+      if (insertError.code === '23505') {
+        setError('This WhatsApp number is already connected to another account.')
+      } else {
         setError('Something went wrong. Please try again.')
-        setLoading(false)
-        return
       }
-
-      setStep(3)
-    } catch {
-      setError('Something went wrong. Please try again.')
       setLoading(false)
+      return
     }
+
+    // Send welcome WhatsApp message to parent
+    if (newFamily) {
+      await fetch('/api/welcome', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ family_id: newFamily.id })
+      })
+    }
+
+    setStep(3)
+  } catch {
+    setError('Something went wrong. Please try again.')
+    setLoading(false)
   }
+}
 
   const inputStyle: React.CSSProperties = {
     padding: '14px 18px',
