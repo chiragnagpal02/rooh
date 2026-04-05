@@ -94,18 +94,35 @@ export async function POST(req: NextRequest) {
 
 async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
   const token = process.env.WHATSAPP_API_KEY
-  if (!token) return null
+  if (!token) {
+    console.error('No WHATSAPP_API_KEY set')
+    return null
+  }
 
   try {
+    // Get download URL from Meta
     const metaRes = await fetch(
       `https://graph.facebook.com/v18.0/${audioId}`,
       { headers: { 'Authorization': `Bearer ${token}` } }
     )
     const meta = await metaRes.json()
+    console.log('Meta audio response:', JSON.stringify(meta))
 
+    if (!meta.url) {
+      console.error('No URL in Meta response:', meta)
+      return null
+    }
+
+    // Download audio
     const audioRes = await fetch(meta.url, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
+
+    if (!audioRes.ok) {
+      console.error('Audio download failed:', audioRes.status, audioRes.statusText)
+      return null
+    }
+
     const arrayBuffer = await audioRes.arrayBuffer()
     return Buffer.from(arrayBuffer)
   } catch (err) {
