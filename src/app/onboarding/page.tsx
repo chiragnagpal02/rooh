@@ -31,7 +31,6 @@ export default function OnboardingPage() {
     }
     setUserEmail(user.email || '')
 
-    // If family already exists, skip onboarding
     const { data: family } = await supabase
       .from('families')
       .select('id')
@@ -41,6 +40,11 @@ export default function OnboardingPage() {
     if (family) {
       router.push('/dashboard')
     }
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   async function handleFinish() {
@@ -105,19 +109,62 @@ export default function OnboardingPage() {
       justifyContent: 'center',
       padding: '32px'
     }}>
+
+      {/* Sign out button — fixed top right */}
+      <div style={{ position: 'fixed', top: '16px', right: '24px' }}>
+        <button
+          onClick={handleSignOut}
+          style={{
+            fontSize: '13px',
+            color: '#78716C',
+            background: 'none',
+            border: '0.5px solid #E8E0D5',
+            borderRadius: '8px',
+            padding: '6px 14px',
+            cursor: 'pointer'
+          }}
+        >
+          Sign out
+        </button>
+      </div>
+
       <div style={{ width: '100%', maxWidth: '420px' }}>
 
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <svg width="120" height="38" viewBox="0 0 120 38" xmlns="http://www.w3.org/2000/svg" style={{ margin: '0 auto 8px', display: 'block' }}>
             <path d="M5 19 Q8 10 11 19 Q14 28 17 19" fill="none" stroke="#1D9E75" strokeWidth="1.5" strokeLinecap="round"/>
             <text x="24" y="27" fontFamily="Georgia, serif" fontSize="26" fontWeight="400" fill="#1C1917" letterSpacing="1">Rooh</text>
           </svg>
         </div>
 
+        {/* Context banner — steps 1 and 2 only */}
+        {step !== 3 && (
+          <div style={{
+            background: '#F0FAF6',
+            border: '0.5px solid #9FE1CB',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            marginBottom: '24px',
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-start'
+          }}>
+            <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>🙏</span>
+            <p style={{
+              fontSize: '13px',
+              color: '#085041',
+              margin: 0,
+              lineHeight: 1.6
+            }}>
+              Your account is ready - you just need to connect your first parent to get started. This takes about 2 minutes.
+            </p>
+          </div>
+        )}
+
         {/* Step indicator */}
         {step !== 3 && (
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginBottom: '24px' }}>
             {[1, 2].map(s => (
               <div
                 key={s}
@@ -148,7 +195,7 @@ export default function OnboardingPage() {
               color: '#1C1917',
               margin: '0 0 8px'
             }}>
-              Welcome to Rooh
+              First, tell us your name
             </h1>
             <p style={{
               fontSize: '14px',
@@ -156,7 +203,7 @@ export default function OnboardingPage() {
               margin: '0 0 28px',
               lineHeight: 1.6
             }}>
-              Let's set up your family archive. This takes about 2 minutes.
+              This is how we'll personalise your family archive.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -199,15 +246,23 @@ export default function OnboardingPage() {
               color: '#1C1917',
               margin: '0 0 8px'
             }}>
-              Tell us about your parent
+              Now, tell us about your parent
             </h1>
             <p style={{
               fontSize: '14px',
               color: '#78716C',
-              margin: '0 0 28px',
+              margin: '0 0 4px',
               lineHeight: 1.6
             }}>
-              We'll send them a gentle welcome message on WhatsApp — in their language, at their pace.
+              We'll connect them via WhatsApp so they can start sharing memories in their own language, at their own pace.
+            </p>
+            <p style={{
+              fontSize: '13px',
+              color: '#A8A29E',
+              margin: '0 0 24px',
+              lineHeight: 1.5
+            }}>
+              You can add more family members from your dashboard later.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -230,13 +285,13 @@ export default function OnboardingPage() {
                 </label>
                 <input
                   type="tel"
-                  placeholder="+91 98765 43210"
+                  placeholder="eg. 919876543210"
                   value={parentWhatsapp}
                   onChange={e => setParentWhatsapp(e.target.value)}
                   style={inputStyle}
                 />
                 <p style={{ fontSize: '12px', color: '#A8A29E', margin: '6px 0 0' }}>
-                  Include country code. e.g. +91 for India, +65 for Singapore.
+                  Include country code without the "+" sign: Example, 91 for India, 65 for Singapore.
                 </p>
               </div>
 
@@ -309,7 +364,7 @@ export default function OnboardingPage() {
             <p style={{
               fontSize: '15px',
               color: '#57534E',
-              margin: '0 0 8px',
+              margin: '0 0 16px',
               lineHeight: 1.6
             }}>
               We've saved {parentName}'s details.
@@ -317,14 +372,22 @@ export default function OnboardingPage() {
             <p style={{
               fontSize: '14px',
               color: '#78716C',
-              margin: '0 0 32px',
+              margin: '0 0 12px',
               lineHeight: 1.6,
               background: '#F0FAF6',
               padding: '12px 16px',
               borderRadius: '10px',
               border: '0.5px solid #9FE1CB'
             }}>
-              Once your WhatsApp is connected, {parentName} will receive their first message and can start recording memories right away.
+              Once your WhatsApp is connected, {parentName} will receive a gentle welcome message and can start recording memories right away.
+            </p>
+            <p style={{
+              fontSize: '13px',
+              color: '#A8A29E',
+              margin: '0 0 28px',
+              lineHeight: 1.5
+            }}>
+              You can add more family members from your dashboard at any time.
             </p>
             <button
               onClick={() => router.push('/dashboard')}

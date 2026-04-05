@@ -2,34 +2,42 @@
 
 import { useState } from 'react'
 import { createSupabaseBrowser } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const router = useRouter()
+  const supabase = createSupabaseBrowser()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    if (!email) return
+    if (!email || !password) return
     setLoading(true)
     setError('')
 
-    const supabase = createSupabaseBrowser()
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
-      }
-    })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError(error.message)
+      setError('Incorrect email or password.')
       setLoading(false)
     } else {
-      setSent(true)
-      setLoading(false)
+      router.push('/dashboard')
     }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    padding: '14px 18px',
+    fontSize: '15px',
+    border: '1px solid #D6CEC4',
+    borderRadius: '10px',
+    background: '#FDF8F3',
+    color: '#1C1917',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box'
   }
 
   return (
@@ -54,109 +62,81 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {!sent ? (
-          <div style={{
-            background: '#FFF9F4',
-            border: '0.5px solid #E8E0D5',
-            borderRadius: '16px',
-            padding: '32px'
+        <div style={{
+          background: '#FFF9F4',
+          border: '0.5px solid #E8E0D5',
+          borderRadius: '16px',
+          padding: '32px'
+        }}>
+          <h1 style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: '22px',
+            fontWeight: 400,
+            color: '#1C1917',
+            margin: '0 0 8px'
           }}>
-            <h1 style={{
-              fontFamily: 'Georgia, serif',
-              fontSize: '22px',
-              fontWeight: 400,
-              color: '#1C1917',
-              margin: '0 0 8px'
-            }}>
-              Sign in to Rooh
-            </h1>
-            <p style={{
-              fontSize: '14px',
-              color: '#78716C',
-              margin: '0 0 24px',
-              lineHeight: 1.5
-            }}>
-              Enter your email and we will send you a magic link. No password needed.
-            </p>
+            Sign in to Rooh
+          </h1>
+          <p style={{
+            fontSize: '14px',
+            color: '#78716C',
+            margin: '0 0 24px',
+            lineHeight: 1.5
+          }}>
+            Enter your email and password to access your family archive.
+          </p>
 
-            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <label style={{ fontSize: '13px', color: '#78716C', display: 'block', marginBottom: '6px' }}>
+                Email
+              </label>
               <input
                 type="email"
                 placeholder="your@email.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                style={{
-                  padding: '14px 18px',
-                  fontSize: '15px',
-                  border: '1px solid #D6CEC4',
-                  borderRadius: '10px',
-                  background: '#FDF8F3',
-                  color: '#1C1917',
-                  outline: 'none',
-                  width: '100%',
-                  boxSizing: 'border-box' as const
-                }}
+                style={inputStyle}
               />
-              <button
-                type="submit"
-                disabled={loading || !email}
-                style={{
-                  padding: '14px',
-                  background: '#1C1917',
-                  color: '#FDF8F3',
-                  border: 'none',
-                  borderRadius: '10px',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  cursor: loading || !email ? 'not-allowed' : 'pointer',
-                  opacity: loading || !email ? 0.6 : 1,
-                  transition: 'opacity 0.15s'
-                }}
-              >
-                {loading ? 'Sending...' : 'Send magic link'}
-              </button>
-              {error && (
-                <p style={{ fontSize: '13px', color: '#DC2626', margin: 0 }}>{error}</p>
-              )}
-            </form>
-          </div>
-        ) : (
-          <div style={{
-            background: '#F0FAF6',
-            border: '1px solid #A7F3D0',
-            borderRadius: '16px',
-            padding: '32px',
-            textAlign: 'center'
-          }}>
-            <p style={{ fontSize: '32px', margin: '0 0 16px' }}>🙏</p>
-            <h2 style={{
-              fontFamily: 'Georgia, serif',
-              fontSize: '20px',
-              fontWeight: 400,
-              color: '#065F46',
-              margin: '0 0 12px'
-            }}>
-              Check your email
-            </h2>
-            <p style={{ fontSize: '14px', color: '#047857', margin: '0 0 20px', lineHeight: 1.6 }}>
-              We sent a magic link to <strong>{email}</strong>. Click it to sign in — no password needed.
-            </p>
+            </div>
+            <div>
+              <label style={{ fontSize: '13px', color: '#78716C', display: 'block', marginBottom: '6px' }}>
+                Password
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                style={inputStyle}
+              />
+            </div>
             <button
-              onClick={() => { setSent(false); setEmail('') }}
+              type="submit"
+              disabled={loading || !email || !password}
               style={{
-                fontSize: '13px',
-                color: '#047857',
-                background: 'none',
+                padding: '14px',
+                background: '#1C1917',
+                color: '#FDF8F3',
                 border: 'none',
-                cursor: 'pointer',
-                textDecoration: 'underline'
+                borderRadius: '10px',
+                fontSize: '15px',
+                fontWeight: 500,
+                cursor: loading || !email || !password ? 'not-allowed' : 'pointer',
+                opacity: loading || !email || !password ? 0.6 : 1,
+                transition: 'opacity 0.15s',
+                marginTop: '4px'
               }}
             >
-              Use a different email
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
-          </div>
-        )}
+            {error && (
+              <p style={{ fontSize: '13px', color: '#DC2626', margin: 0, textAlign: 'center' }}>{error}</p>
+            )}
+          </form>
+        </div>
 
         <p style={{
           textAlign: 'center',
@@ -164,10 +144,7 @@ export default function LoginPage() {
           color: '#A8A29E',
           marginTop: '24px'
         }}>
-          Don't have an account?{' '}
-          <a href="/" style={{ color: '#1D9E75', textDecoration: 'none' }}>
-            Learn about Rooh
-          </a>
+          Don't have an account? Contact Chirag to get set up.
         </p>
 
       </div>
