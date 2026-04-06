@@ -10,18 +10,16 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Get family for this logged-in user only
   const { data: family } = await supabaseAdmin
     .from('families')
-    .select('id')
+    .select('id, last_active')
     .eq('adult_child_email', user.email)
     .single()
 
   if (!family) {
-    return NextResponse.json({ recordings: [] })
+    return NextResponse.json({ recordings: [], lastActive: null })
   }
 
-  // Only fetch recordings for this family
   const { data, error } = await supabaseAdmin
     .from('recordings')
     .select('*')
@@ -32,21 +30,36 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Generate signed URLs
+  // Get seen recording IDs
+  const { data: seenData } = await supabaseAdmin
+    .from('seen_recordings')
+    .select('recording_id')
+    .eq('family_id', family.id)
+
+  const seenIds = new Set((seenData || []).map(s => s.recording_id))
+
+  // Generate signed URLs and mark seen status
   const recordingsWithSignedUrls = await Promise.all(
     (data || []).map(async (recording) => {
-      if (!recording.audio_url) return recording
+      if (!recording.audio_url) return { ...recording, is_new: !seenIds.has(recording.id) }
       const urlParts = recording.audio_url.split('/recordings/')
-      if (urlParts.length < 2) return recording
+      if (urlParts.length < 2) return { ...recording, is_new: !seenIds.has(recording.id) }
       const filePath = urlParts[1]
       const { data: signedData } = await supabaseAdmin
         .storage
         .from('recordings')
         .createSignedUrl(filePath, 3600)
-      if (!signedData) return recording
-      return { ...recording, audio_url: signedData.signedUrl }
+      if (!signedData) return { ...recording, is_new: !seenIds.has(recording.id) }
+      return {
+        ...recording,
+        audio_url: signedData.signedUrl,
+        is_new: !seenIds.has(recording.id)
+      }
     })
   )
 
-  return NextResponse.json({ recordings: recordingsWithSignedUrls })
+  return NextResponse.json({
+    recordings: recordingsWithSignedUrls,
+    lastActive: family.last_active
+  })
 }

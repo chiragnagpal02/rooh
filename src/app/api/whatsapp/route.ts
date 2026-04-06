@@ -1,67 +1,70 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { transcribeAudio } from '@/lib/whisper'
-import { classifyRecording } from '@/lib/classify'
-import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { transcribeAudio } from "@/lib/whisper";
+import { classifyRecording } from "@/lib/classify";
+import { sendWhatsAppMessage } from "@/lib/whatsapp";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const mode = searchParams.get('hub.mode')
-  const token = searchParams.get('hub.verify_token')
-  const challenge = searchParams.get('hub.challenge')
+  const { searchParams } = new URL(req.url);
+  const mode = searchParams.get("hub.mode");
+  const token = searchParams.get("hub.verify_token");
+  const challenge = searchParams.get("hub.challenge");
 
-  if (mode === 'subscribe' && token === process.env.WEBHOOK_SECRET) {
-    return new NextResponse(challenge, { status: 200 })
+  if (mode === "subscribe" && token === process.env.WEBHOOK_SECRET) {
+    return new NextResponse(challenge, { status: 200 });
   }
 
-  return new NextResponse('Forbidden', { status: 403 })
+  return new NextResponse("Forbidden", { status: 403 });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const body = await req.json();
 
-    const entry = body?.entry?.[0]
-    const change = entry?.changes?.[0]
-    const message = change?.value?.messages?.[0]
+    const entry = body?.entry?.[0];
+    const change = entry?.changes?.[0];
+    const message = change?.value?.messages?.[0];
 
-    if (!message || message.type !== 'audio') {
-      return NextResponse.json({ status: 'ignored' })
+    if (!message || message.type !== "audio") {
+      return NextResponse.json({ status: "ignored" });
     }
 
-    const from = message.from
-    const audioId = message.audio.id
+    const from = message.from;
+    const audioId = message.audio.id;
 
     const { data: family } = await supabaseAdmin
-      .from('families')
-      .select('*')
-      .eq('parent_whatsapp', from)
-      .single()
+      .from("families")
+      .select("*")
+      .eq("parent_whatsapp", from)
+      .single();
 
     if (!family) {
-      console.log('Unknown number:', from)
-      return NextResponse.json({ status: 'unknown_parent' })
+      console.log("Unknown number:", from);
+      return NextResponse.json({ status: "unknown_parent" });
     }
 
-    const audioBuffer = await downloadMetaAudio(audioId)
+    const audioBuffer = await downloadMetaAudio(audioId);
     if (!audioBuffer) {
-      return NextResponse.json({ status: 'audio_download_failed' })
+      return NextResponse.json({ status: "audio_download_failed" });
     }
 
-    const filename = `${family.id}/${Date.now()}.ogg`
+    const filename = `${family.id}/${Date.now()}.ogg`;
     await supabaseAdmin.storage
-      .from('recordings')
-      .upload(filename, audioBuffer, { contentType: 'audio/ogg' })
+      .from("recordings")
+      .upload(filename, audioBuffer, { contentType: "audio/ogg" });
 
     const { data: urlData } = supabaseAdmin.storage
-      .from('recordings')
-      .getPublicUrl(filename)
+      .from("recordings")
+      .getPublicUrl(filename);
 
-    const { text: transcript, language } = await transcribeAudio(audioBuffer, filename)
+    const { text: transcript, language } = await transcribeAudio(
+      audioBuffer,
+      filename,
+    );
 
-    const classification = await classifyRecording(transcript, language)
+    const classification = await classifyRecording(transcript, language);
 
-    await supabaseAdmin.from('recordings').insert({
+    await supabaseAdmin.from("recordings").insert({
       family_id: family.id,
       audio_url: urlData.publicUrl,
       language_detected: language,
@@ -73,74 +76,94 @@ export async function POST(req: NextRequest) {
       extracted_entities: classification.extracted_entities,
       classification_confidence: classification.confidence,
       needs_review: classification.needs_review,
-    })
+    });
+
+    // Update last_active timestamp
+    await supabaseAdmin
+      .from("families")
+      .update({ last_active: new Date().toISOString() })
+      .eq("id", family.id);
 
     await sendWhatsAppMessage(
       from,
-      getConfirmationMessage(family.parent_name, classification.primary_type)
-    )
+      getConfirmationMessage(family.parent_name, classification.primary_type),
+    );
 
     if (classification.followup_prompt) {
-      await sendWhatsAppMessage(from, classification.followup_prompt)
+      await sendWhatsAppMessage(from, classification.followup_prompt);
     }
 
-    return NextResponse.json({ status: 'success' })
-
+    return NextResponse.json({ status: "success" });
   } catch (err) {
-    console.error('Webhook error:', err)
-    return NextResponse.json({ status: 'error' }, { status: 500 })
+    console.error("Webhook error:", err);
+    return NextResponse.json({ status: "error" }, { status: 500 });
   }
 }
 
 async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
-  const token = process.env.WHATSAPP_API_KEY
+  const token = process.env.WHATSAPP_API_KEY;
   if (!token) {
-    console.error('No WHATSAPP_API_KEY set')
-    return null
+    console.error("No WHATSAPP_API_KEY set");
+    return null;
   }
 
   try {
     // Get download URL from Meta
-    const metaRes = await fetch(
-      `https://graph.facebook.com/v18.0/${audioId}`,
-      { headers: { 'Authorization': `Bearer ${token}` } }
-    )
-    const meta = await metaRes.json()
-    console.log('Meta audio response:', JSON.stringify(meta))
+    const metaRes = await fetch(`https://graph.facebook.com/v18.0/${audioId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const meta = await metaRes.json();
+    console.log("Meta audio response:", JSON.stringify(meta));
 
     if (!meta.url) {
-      console.error('No URL in Meta response:', meta)
-      return null
+      console.error("No URL in Meta response:", meta);
+      return null;
     }
 
     // Download audio
     const audioRes = await fetch(meta.url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
     if (!audioRes.ok) {
-      console.error('Audio download failed:', audioRes.status, audioRes.statusText)
-      return null
+      console.error(
+        "Audio download failed:",
+        audioRes.status,
+        audioRes.statusText,
+      );
+      return null;
     }
 
-    const arrayBuffer = await audioRes.arrayBuffer()
-    return Buffer.from(arrayBuffer)
+    const arrayBuffer = await audioRes.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   } catch (err) {
-    console.error('Audio download error:', err)
-    return null
+    console.error("Audio download error:", err);
+    return null;
   }
 }
 
 function getConfirmationMessage(parentName: string, type: string): string {
-  const name = parentName.split(' ')[0]
+  const name = parentName.split(" ")[0];
 
   const messages: Record<string, string> = {
-    story: 'Thank you ' + name + ' \uD83D\uDE4F Your memory has been saved safely. Your family will treasure this.',
-    practical: 'Thank you ' + name + '. That important information has been saved for your family.',
-    legacy: 'Thank you ' + name + ' \uD83D\uDE4F Your message has been saved with care, in your exact words.',
-    mixed: 'Thank you ' + name + ' \uD83D\uDE4F Your recording has been saved safely for your family.',
-    untagged: 'Thank you ' + name + '. Your recording has been saved.'
-  }
+    story:
+      "Thank you " +
+      name +
+      " \uD83D\uDE4F Your memory has been saved safely. Your family will treasure this.",
+    practical:
+      "Thank you " +
+      name +
+      ". That important information has been saved for your family.",
+    legacy:
+      "Thank you " +
+      name +
+      " \uD83D\uDE4F Your message has been saved with care, in your exact words.",
+    mixed:
+      "Thank you " +
+      name +
+      " \uD83D\uDE4F Your recording has been saved safely for your family.",
+    untagged: "Thank you " + name + ". Your recording has been saved.",
+  };
 
-  return messages[type] || messages.untagged
+  return messages[type] || messages.untagged;
 }

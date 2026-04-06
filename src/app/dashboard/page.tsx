@@ -25,6 +25,22 @@ function formatDate(dateStr: string) {
   });
 }
 
+function formatLastActive(dateStr: string | null) {
+  if (!dateStr) return null;
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+
+  if (diffMins < 60) return "just now";
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? "s" : ""} ago`;
+}
+
 function aggregateEntities(recordings: Recording[]) {
   const entities = {
     medical: [] as any[],
@@ -65,7 +81,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [parentName, setParentName] = useState("Your parent");
   const [showPractical, setShowPractical] = useState(true);
-  const [checking, setChecking] = useState(true) // add this with other states
+  const [checking, setChecking] = useState(true); // add this with other states
+  const [lastActive, setLastActive] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const router = useRouter();
   const supabase = createSupabaseBrowser();
@@ -74,36 +91,51 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-async function fetchData() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    router.push('/login')
-    return
+  async function fetchData() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const { data: family } = await supabase
+      .from("families")
+      .select("parent_name")
+      .eq("adult_child_email", user.email)
+      .single();
+
+    if (!family) {
+      router.push("/onboarding");
+      return;
+    }
+
+    setParentName(family.parent_name);
+    setChecking(false); // only show dashboard after we confirm family exists
+
+    const res = await fetch("/api/recordings");
+    const data = await res.json();
+    if (data.recordings) setRecordings(data.recordings);
+    if (data.lastActive) setLastActive(data.lastActive);
+    setLoading(false);
   }
-
-  const { data: family } = await supabase
-    .from('families')
-    .select('parent_name')
-    .eq('adult_child_email', user.email)
-    .single()
-
-  if (!family) {
-    router.push('/onboarding')
-    return
-  }
-
-  setParentName(family.parent_name)
-  setChecking(false) // only show dashboard after we confirm family exists
-
-  const res = await fetch('/api/recordings')
-  const data = await res.json()
-  if (data.recordings) setRecordings(data.recordings)
-  setLoading(false)
-}
 
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/login");
+  }
+
+  async function markAsSeen(recordingId: string) {
+    await fetch("/api/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recording_id: recordingId }),
+    });
+    // Update local state
+    setRecordings((prev) =>
+      prev.map((r) => (r.id === recordingId ? { ...r, is_new: false } : r)),
+    );
   }
 
   const filtered = recordings
@@ -143,18 +175,20 @@ async function fetchData() {
   );
 
   if (checking) {
-  return (
-    <main style={{ 
-      background: '#FDF8F3', 
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center'
-    }}>
-      <p style={{ fontSize: '14px', color: '#A8A29E' }}>Loading...</p>
-    </main>
-  )
-}
+    return (
+      <main
+        style={{
+          background: "#FDF8F3",
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p style={{ fontSize: "14px", color: "#A8A29E" }}>Loading...</p>
+      </main>
+    );
+  }
 
   return (
     <main style={{ background: "#FDF8F3", minHeight: "100vh" }}>
@@ -247,11 +281,44 @@ async function fetchData() {
           >
             {parentName}'s memories
           </h1>
-          <p style={{ fontSize: "14px", color: "#A8A29E", margin: 0 }}>
-            {recordings.length === 0
-              ? "No recordings yet"
-              : `${recordings.length} ${recordings.length === 1 ? "memory" : "memories"} preserved`}
-          </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <p style={{ fontSize: "14px", color: "#A8A29E", margin: 0 }}>
+              {recordings.length === 0
+                ? "No recordings yet"
+                : `${recordings.length} ${recordings.length === 1 ? "memory" : "memories"} preserved`}
+            </p>
+            {lastActive && (
+              <>
+                <span style={{ color: "#E8E0D5", fontSize: "12px" }}>·</span>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "5px" }}
+                >
+                  <div
+                    style={{
+                      width: "7px",
+                      height: "7px",
+                      borderRadius: "50%",
+                      background:
+                        formatLastActive(lastActive) === "just now"
+                          ? "#1D9E75"
+                          : "#D6CEC4",
+                    }}
+                  />
+                  <p style={{ fontSize: "14px", color: "#A8A29E", margin: 0 }}>
+                    {parentName.split(" ")[0]} last recorded{" "}
+                    {formatLastActive(lastActive)}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Stats */}
@@ -633,9 +700,13 @@ async function fetchData() {
                 >
                   {/* Card header */}
                   <button
-                    onClick={() =>
-                      setExpanded(isExpanded ? null : recording.id)
-                    }
+                    onClick={() => {
+                      const nowExpanded = isExpanded ? null : recording.id;
+                      setExpanded(nowExpanded);
+                      if (nowExpanded && recording.is_new) {
+                        markAsSeen(recording.id);
+                      }
+                    }}
                     style={{
                       width: "100%",
                       textAlign: "left",
@@ -713,18 +784,29 @@ async function fetchData() {
                         )}
                       </div>
                     </div>
-                    <span
-                      style={{
-                        color: "#D6CEC4",
-                        fontSize: "18px",
-                        flexShrink: 0,
-                        marginTop: "4px",
-                        transform: isExpanded ? "rotate(180deg)" : "none",
-                        transition: "transform 0.2s",
-                      }}
-                    >
-                      ↓
-                    </span>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", flexShrink: 0 }}>
+                      {recording.is_new && (
+                        <div style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "#1D9E75",
+                          flexShrink: 0,
+                          marginTop: "8px",
+                        }} />
+                      )}
+                      <span
+                        style={{
+                          color: "#D6CEC4",
+                          fontSize: "18px",
+                          marginTop: "4px",
+                          transform: isExpanded ? "rotate(180deg)" : "none",
+                          transition: "transform 0.2s",
+                        }}
+                      >
+                        ↓
+                      </span>
+                    </div>
                   </button>
 
                   {/* Expanded content */}
@@ -914,4 +996,3 @@ async function fetchData() {
     </main>
   );
 }
-

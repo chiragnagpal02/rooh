@@ -19,6 +19,7 @@ export interface ExtractedEntities {
 }
 
 export interface Recording {
+  is_new: string | null
   id: string
   family_id: string
   audio_url: string | null
