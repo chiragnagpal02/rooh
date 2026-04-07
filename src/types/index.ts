@@ -19,21 +19,20 @@ export interface ExtractedEntities {
 }
 
 export interface Recording {
-  is_new: boolean | null
   id: string
   family_id: string
   audio_url: string | null
-  duration_seconds: number | null
   language_detected: string | null
   transcript_original: string | null
   english_summary: string | null
   primary_type: RecordingType
   story_tags: string[]
   legacy_tags: string[]
-  extracted_entities: ExtractedEntities
+  extracted_entities: Record<string, any[]>
   classification_confidence: number
   needs_review: boolean
   created_at: string
+  is_new?: boolean
 }
 
 export interface ClassificationResult {
