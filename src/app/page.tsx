@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import posthog from "posthog-js";
 
 export default function Home() {
@@ -9,8 +9,11 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showTop, setShowTop] = useState(false);
 
+  // Canvas Ref for proper React access
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // PostHog + Scroll + Observer
   useEffect(() => {
     if (typeof window !== "undefined") {
       posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
@@ -33,7 +36,7 @@ export default function Home() {
     );
     document.querySelectorAll(".fade-up").forEach((el) => observer.observe(el));
 
-    // Progress bar + back to top visibility
+    // Progress bar + back to top
     const handleScroll = () => {
       const scrollTop = window.scrollY;
       const docHeight =
@@ -49,6 +52,101 @@ export default function Home() {
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  // Elegant Hands + Heart Animation (using useRef - proper way)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    let rafId: number;
+    let startTime = Date.now();
+
+    const draw = (progress: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const t = (progress % 1); // smooth 0–1 loop
+
+      ctx.lineWidth = 6.5;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#1C1917";
+
+      // Left hand (older generation) — moves gently inward
+      const leftXOffset = Math.max(0, 40 - t * 55);
+      ctx.beginPath();
+      ctx.moveTo(75 + leftXOffset, 125);
+      ctx.quadraticCurveTo(110 + leftXOffset * 0.6, 88, 155, 118);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(88 + leftXOffset, 165);
+      ctx.quadraticCurveTo(125 + leftXOffset * 0.5, 188, 160, 155);
+      ctx.stroke();
+
+      // Right hand (younger generation) — moves gently inward
+      const rightXOffset = Math.max(0, 40 - t * 55);
+      ctx.beginPath();
+      ctx.moveTo(345 - rightXOffset, 125);
+      ctx.quadraticCurveTo(310 - rightXOffset * 0.6, 88, 265, 118);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(332 - rightXOffset, 165);
+      ctx.quadraticCurveTo(295 - rightXOffset * 0.5, 188, 260, 155);
+      ctx.stroke();
+
+      // Heart in the center — gently pulses and appears as hands come closer
+      const heartProgress = Math.max(0, t * 1.6 - 0.3);
+      const heartScale = 0.92 + Math.sin(t * Math.PI * 3.5) * 0.07;
+      const heartOpacity = Math.min(1, heartProgress * 2.2);
+
+      ctx.save();
+      ctx.translate(210, 142);
+      ctx.scale(heartScale, heartScale);
+
+      ctx.beginPath();
+      ctx.moveTo(0, 20);
+      ctx.bezierCurveTo(-19, -7, -36, 8, 0, 39);
+      ctx.bezierCurveTo(36, 8, 19, -7, 0, 20);
+      ctx.closePath();
+
+      ctx.lineWidth = 7.5;
+      ctx.strokeStyle = `rgba(29, 158, 117, ${heartOpacity})`;
+      ctx.stroke();
+
+      ctx.fillStyle = `rgba(29, 158, 117, ${heartOpacity * 0.11})`;
+      ctx.fill();
+      ctx.restore();
+    };
+
+    const animate = () => {
+      const elapsed = (Date.now() - startTime) / 4200; // ~4.2s gentle loop
+      draw(elapsed);
+      rafId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    // Click interaction: make the heart beat stronger
+    const handleClick = () => {
+      startTime = Date.now() - 2100; // jump forward for nice pulse
+      canvas.style.transform = "scale(0.95)";
+      setTimeout(() => {
+        canvas.style.transform = "scale(1)";
+      }, 140);
+    };
+
+    canvas.addEventListener("click", handleClick);
+    canvas.style.cursor = "pointer";
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      canvas.removeEventListener("click", handleClick);
     };
   }, []);
 
@@ -159,41 +257,41 @@ export default function Home() {
       </div>
 
       <style>{`
-  .fade-up {
-    opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-  .fade-up.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .fade-up-delay-1 { transition-delay: 0.1s; }
-  .fade-up-delay-2 { transition-delay: 0.2s; }
-  .fade-up-delay-3 { transition-delay: 0.3s; }
-  .fade-up-delay-4 { transition-delay: 0.4s; }
-  input:focus {
-    border-color: #1D9E75 !important;
-    box-shadow: 0 0 0 3px rgba(29,158,117,0.1);
-  }
-  button:hover:not(:disabled) {
-    opacity: 0.88 !important;
-    transform: translateY(-1px);
-  }
-  button { transition: opacity 0.15s, transform 0.15s !important; }
-  .nav-link:hover { opacity: 0.85; }
-  .pillar-card { transition: transform 0.2s ease; }
-  .pillar-card:hover { transform: translateX(4px); }
-  .security-card { transition: transform 0.2s ease; }
-  .security-card:hover { transform: translateY(-2px); }
-  #back-to-top {
-    opacity: 0;
-    transition: opacity 0.3s ease, transform 0.2s ease;
-  }
-  #back-to-top:hover {
-    transform: translateY(-2px);
-  }
-`}</style>
+        .fade-up {
+          opacity: 0;
+          transform: translateY(24px);
+          transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .fade-up.visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        .fade-up-delay-1 { transition-delay: 0.1s; }
+        .fade-up-delay-2 { transition-delay: 0.2s; }
+        .fade-up-delay-3 { transition-delay: 0.3s; }
+        .fade-up-delay-4 { transition-delay: 0.4s; }
+        input:focus {
+          border-color: #1D9E75 !important;
+          box-shadow: 0 0 0 3px rgba(29,158,117,0.1);
+        }
+        button:hover:not(:disabled) {
+          opacity: 0.88 !important;
+          transform: translateY(-1px);
+        }
+        button { transition: opacity 0.15s, transform 0.15s !important; }
+        .nav-link:hover { opacity: 0.85; }
+        .pillar-card { transition: transform 0.2s ease; }
+        .pillar-card:hover { transform: translateX(4px); }
+        .security-card { transition: transform 0.2s ease; }
+        .security-card:hover { transform: translateY(-2px); }
+        #back-to-top {
+          opacity: 0;
+          transition: opacity 0.3s ease, transform 0.2s ease;
+        }
+        #back-to-top:hover {
+          transform: translateY(-2px);
+        }
+      `}</style>
 
       {/* Nav */}
       <nav
@@ -303,9 +401,43 @@ export default function Home() {
           }}
         >
           Their stories. Their memories. Where the documents are. What they want
-          you to know. Rooh keeps it all - so you always have them, even when
+          you to know. Rooh keeps it all — so you always have them, even when
           you cannot be there.
         </p>
+
+        {/* Elegant Moving Hands + Heart Animation */}
+        <div
+          className="fade-up fade-up-delay-2"
+          style={{
+            margin: "0 auto 52px",
+            maxWidth: "420px",
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            width="420"
+            height="260"
+            style={{
+              width: "100%",
+              border: "1px solid #E8E0D5",
+              borderRadius: "20px",
+              background: "#FFF9F4",
+              boxShadow: "0 4px 25px rgba(29, 158, 117, 0.06)",
+              display: "block",
+            }}
+          />
+          <p
+            style={{
+              fontSize: "13px",
+              color: "#A8A29E",
+              marginTop: "16px",
+              fontWeight: 500,
+            }}
+          >
+            Three generations. One heart. Forever.
+          </p>
+        </div>
+
         <div className="fade-up fade-up-delay-3">
           {submitted ? (
             successBox
@@ -351,14 +483,6 @@ export default function Home() {
           )}
         </div>
       </section>
-
-      <div
-        style={{
-          borderTop: "0.5px solid #E8E0D5",
-          maxWidth: "680px",
-          margin: "0 auto",
-        }}
-      />
 
       {/* Pain */}
       <section
