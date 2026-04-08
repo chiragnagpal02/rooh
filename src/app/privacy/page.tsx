@@ -282,22 +282,6 @@ export default function PrivacyPolicy() {
             .
           </p>
 
-          {/* Children's Privacy */}
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: 500,
-              color: "#1C1917",
-              marginTop: "32px",
-              marginBottom: "16px",
-            }}
-          >
-            8. Children's Privacy
-          </h2>
-          <p>
-            Rooh is not intended for children under 13. We do not knowingly collect personal information from children under 13. If we learn we have collected such information, we will promptly delete it.
-          </p>
-
           {/* Data Retention */}
           <h2
             style={{
