@@ -20,6 +20,7 @@ interface Props {
   userEmail: string;
   lastActive: string | null;
   loading: boolean;
+  adultName: string;
   onMarkSeen: (id: string) => void;
   onParentAdded: (parent: Parent) => void;
 }
@@ -138,6 +139,7 @@ export default function LayoutShell({
   userEmail,
   lastActive,
   loading,
+  adultName,
   onMarkSeen,
   onParentAdded,
 }: Props) {
@@ -425,6 +427,8 @@ export default function LayoutShell({
             <MemoriesView
               recordings={recordings}
               parents={parents}
+              userEmail={userEmail}
+              adultName={adultName} // need to add this to LayoutShell props too
               loading={loading}
               onMarkSeen={onMarkSeen}
             />

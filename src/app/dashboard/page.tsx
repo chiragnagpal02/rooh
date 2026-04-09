@@ -22,6 +22,7 @@ export default function Dashboard() {
   const [checking, setChecking] = useState(true)
   const [familyId, setFamilyId] = useState('')
   const [userEmail, setUserEmail] = useState('')
+  const [adultName, setAdultName] = useState('')
   const [lastActive, setLastActive] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createSupabaseBrowser()
@@ -35,13 +36,14 @@ export default function Dashboard() {
 
     const { data: family } = await supabase
       .from('families')
-      .select('id')
+      .select('id, adult_child_name')
       .eq('adult_child_email', user.email)
       .single()
 
     if (!family) { router.push('/onboarding'); return }
 
     setFamilyId(family.id)
+    setAdultName(family.adult_child_name)
     setChecking(false)
 
     const res = await fetch('/api/recordings')
@@ -81,6 +83,7 @@ export default function Dashboard() {
       parents={parents}
       familyId={familyId}
       userEmail={userEmail}
+      adultName={adultName}
       lastActive={lastActive}
       loading={loading}
       onMarkSeen={handleMarkSeen}
