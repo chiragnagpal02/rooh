@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
     const { data: family } = await supabaseAdmin
       .from("families")
-      .select("*")
+      .select("id")
       .eq("adult_child_email", userEmail)
       .single();
 
@@ -19,38 +19,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "No family" });
     }
 
-    const response = await fetch(
-      `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: family.parent_whatsapp,
-          type: "template",
-          template: {
-            name: "rooh_prompt",
-            language: { code: "en" },
-            components: [{
-              type: "body",
-              parameters: [
-                { type: "text", text: family.parent_name.split(" ")[0] },
-                { type: "text", text: prompt },
-              ],
-            }],
+    // Fetch all parents for this family
+    const { data: parents } = await supabaseAdmin
+      .from("parents")
+      .select("*")
+      .eq("family_id", family.id)
+      .order("created_at", { ascending: true })
+
+    if (!parents || parents.length === 0) {
+      return NextResponse.json({ success: false, error: "No parents found" });
+    }
+
+    // Send prompt to all connected parents
+    for (const parent of parents) {
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_API_KEY}`,
+            "Content-Type": "application/json",
           },
-        }),
-      },
-    );
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: parent.whatsapp,
+            type: "template",
+            template: {
+              name: "rooh_prompt",
+              language: { code: "en" },
+              components: [{
+                type: "body",
+                parameters: [
+                  { type: "text", text: parent.name.split(" ")[0] },
+                  { type: "text", text: prompt },
+                ],
+              }],
+            },
+          }),
+        },
+      );
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("WhatsApp send failed:", data);
-      return NextResponse.json({ success: false, error: "WhatsApp send failed" });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error(`WhatsApp send failed for ${parent.name}:`, data);
+      }
     }
 
     await supabaseAdmin.from("prompt_log").insert({
