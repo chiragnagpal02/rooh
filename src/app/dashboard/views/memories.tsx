@@ -1,6 +1,7 @@
 'use client'
 
 import { Recording, RecordingType } from '@/types'
+import { Parent } from '../page'
 import { useState } from 'react'
 
 const TYPE_CONFIG: Record<RecordingType, { label: string; color: string; bg: string }> = {
@@ -18,15 +19,18 @@ function formatDate(dateStr: string) {
 
 interface Props {
   recordings: Recording[]
-  parentName: string
+  parents: Parent[]
   loading: boolean
   onMarkSeen: (id: string) => void
 }
 
-export default function MemoriesView({ recordings, parentName, loading, onMarkSeen }: Props) {
+export default function MemoriesView({ recordings, parents, loading, onMarkSeen }: Props) {
   const [filter, setFilter] = useState<RecordingType | 'all'>('all')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+
+  // Build a lookup map for quick parent name resolution
+  const parentMap = Object.fromEntries(parents.map(p => [p.id, p.name]))
 
   const filtered = recordings
     .filter(r => filter === 'all' || r.primary_type === filter)
@@ -114,6 +118,10 @@ export default function MemoriesView({ recordings, parentName, loading, onMarkSe
           {filtered.map(recording => {
             const config = TYPE_CONFIG[recording.primary_type]
             const isExpanded = expanded === recording.id
+            const recordingParentName = (recording as any).parent_id
+              ? parentMap[(recording as any).parent_id] || 'Your parent'
+              : parents[0]?.name || 'Your parent'
+
             return (
               <div key={recording.id} style={{ background: 'white', border: isExpanded ? '1px solid #D6CEC4' : '0.5px solid #E8E0D5', borderRadius: '16px', overflow: 'hidden', transition: 'border-color 0.15s' }}>
                 <button
@@ -125,9 +133,16 @@ export default function MemoriesView({ recordings, parentName, loading, onMarkSe
                   style={{ width: '100%', textAlign: 'left', padding: '20px 24px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '12px', color: '#A8A29E', margin: '0 0 8px', fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
-                      {formatDate(recording.created_at)}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <p style={{ fontSize: '12px', color: '#A8A29E', margin: 0, fontFamily: 'Georgia, serif', fontStyle: 'italic' }}>
+                        {formatDate(recording.created_at)}
+                      </p>
+                      {parents.length > 1 && (
+                        <span style={{ fontSize: '11px', color: '#A8A29E', background: '#F5F0EA', padding: '2px 8px', borderRadius: '20px' }}>
+                          {recordingParentName.split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
                     <p style={{ fontFamily: 'Georgia, serif', fontSize: '16px', lineHeight: 1.5, color: '#1C1917', margin: '0 0 12px' }}>
                       {recording.english_summary?.split('.')[0]}.
                     </p>
@@ -135,7 +150,9 @@ export default function MemoriesView({ recordings, parentName, loading, onMarkSe
                       <span style={{ fontSize: '11px', fontWeight: 500, padding: '3px 10px', borderRadius: '20px', background: config.bg, color: config.color }}>
                         {config.label}
                       </span>
-                      {recording.language_detected && <span style={{ fontSize: '12px', color: '#C8C0B8' }}>{recording.language_detected}</span>}
+                      {recording.language_detected && (
+                        <span style={{ fontSize: '12px', color: '#C8C0B8' }}>{recording.language_detected}</span>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', flexShrink: 0, marginTop: '4px' }}>
@@ -166,7 +183,9 @@ export default function MemoriesView({ recordings, parentName, loading, onMarkSe
                     )}
                     {recording.primary_type === 'legacy' && (
                       <div style={{ background: '#FAEEDA', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>
-                        <p style={{ fontSize: '13px', color: '#633806', margin: 0 }}>This is a personal message kept in {parentName}'s exact words.</p>
+                        <p style={{ fontSize: '13px', color: '#633806', margin: 0 }}>
+                          This is a personal message kept in {recordingParentName}'s exact words.
+                        </p>
                       </div>
                     )}
                     {recording.extracted_entities && Object.keys(recording.extracted_entities).length > 0 && (

@@ -35,16 +35,19 @@ export async function POST(req: NextRequest) {
     const from = message.from;
     const audioId = message.audio.id;
 
-    const { data: family } = await supabaseAdmin
-      .from("families")
-      .select("*")
-      .eq("parent_whatsapp", from)
+    // Look up parent in parents table, join family for notification prefs
+    const { data: parent } = await supabaseAdmin
+      .from("parents")
+      .select("*, families(*)")
+      .eq("whatsapp", from)
       .single();
 
-    if (!family) {
+    if (!parent) {
       console.log("Unknown number:", from);
       return NextResponse.json({ status: "unknown_parent" });
     }
+
+    const family = parent.families as any;
 
     const audioBuffer = await downloadMetaAudio(audioId);
     if (!audioBuffer) {
@@ -69,6 +72,7 @@ export async function POST(req: NextRequest) {
 
     await supabaseAdmin.from("recordings").insert({
       family_id: family.id,
+      parent_id: parent.id,
       audio_url: urlData.publicUrl,
       language_detected: language,
       transcript_original: transcript,
@@ -81,15 +85,16 @@ export async function POST(req: NextRequest) {
       needs_review: classification.needs_review,
     });
 
+    // Update last_active on the parent row
     await supabaseAdmin
-      .from("families")
+      .from("parents")
       .update({ last_active: new Date().toISOString() })
-      .eq("id", family.id);
+      .eq("id", parent.id);
 
-    // Confirmation message back to parent
+    // Confirmation back to parent
     await sendWhatsAppMessage(
       from,
-      getConfirmationMessage(family.parent_name, classification.primary_type),
+      getConfirmationMessage(parent.name, classification.primary_type),
     );
 
     if (classification.followup_prompt) {
@@ -97,7 +102,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Notify adult child
-    await notifyAdultChild(family, classification.primary_type);
+    await notifyAdultChild(parent.name, family, classification.primary_type);
 
     return NextResponse.json({ status: "success" });
   } catch (err) {
@@ -106,11 +111,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function notifyAdultChild(family: any, recordingType: string) {
-  const parentFirstName = family.parent_name.split(" ")[0];
+async function notifyAdultChild(
+  parentName: string,
+  family: any,
+  recordingType: string
+) {
+  const parentFirstName = parentName.split(" ")[0];
   const adultFirstName = family.adult_child_name.split(" ")[0];
 
-  // WhatsApp notification
   if (family.notify_whatsapp && family.adult_child_whatsapp) {
     try {
       const response = await fetch(
@@ -148,7 +156,6 @@ async function notifyAdultChild(family: any, recordingType: string) {
     }
   }
 
-  // Email notification
   if (family.notify_email && family.adult_child_email) {
     try {
       await resend.emails.send({
@@ -169,11 +176,9 @@ function getEmailHtml(adultName: string, parentName: string): string {
 <html>
 <body style="margin: 0; padding: 0; background: #FDF8F3; font-family: Georgia, serif;">
   <div style="max-width: 480px; margin: 40px auto; padding: 0 24px;">
-
     <div style="text-align: center; margin-bottom: 32px;">
       <p style="font-size: 28px; color: #1C1917; margin: 0; letter-spacing: 1px;">Rooh</p>
     </div>
-
     <div style="background: white; border: 0.5px solid #E8E0D5; border-radius: 16px; padding: 32px; text-align: center;">
       <div style="font-size: 32px; margin-bottom: 16px;">🙏</div>
       <h1 style="font-size: 22px; font-weight: 400; color: #1C1917; margin: 0 0 12px;">
@@ -188,12 +193,10 @@ function getEmailHtml(adultName: string, parentName: string): string {
         Open your archive
       </a>
     </div>
-
     <p style="text-align: center; font-size: 12px; color: #A8A29E; margin-top: 24px; font-family: sans-serif;">
       You're receiving this because you set up notifications in Rooh.
       <a href="https://rooh.family/dashboard" style="color: #A8A29E;">Manage settings</a>
     </p>
-
   </div>
 </body>
 </html>
@@ -238,7 +241,6 @@ async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
 
 function getConfirmationMessage(parentName: string, type: string): string {
   const name = parentName.split(" ")[0];
-
   const messages: Record<string, string> = {
     story: "Thank you " + name + " 🙏 Your memory has been saved safely. Your family will treasure this.",
     practical: "Thank you " + name + ". That important information has been saved for your family.",
@@ -246,6 +248,5 @@ function getConfirmationMessage(parentName: string, type: string): string {
     mixed: "Thank you " + name + " 🙏 Your recording has been saved safely for your family.",
     untagged: "Thank you " + name + ". Your recording has been saved.",
   };
-
   return messages[type] || messages.untagged;
 }

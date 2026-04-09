@@ -6,12 +6,21 @@ import { Recording } from '@/types'
 import { useRouter } from 'next/navigation'
 import LayoutShell from './layout-shell'
 
+export interface Parent {
+  id: string
+  family_id: string
+  name: string
+  whatsapp: string
+  created_at: string
+  last_active: string | null
+}
+
 export default function Dashboard() {
   const [recordings, setRecordings] = useState<Recording[]>([])
+  const [parents, setParents] = useState<Parent[]>([])
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(true)
-  const [parentName, setParentName] = useState('Your parent')
-  const [parentWhatsapp, setParentWhatsapp] = useState('')
+  const [familyId, setFamilyId] = useState('')
   const [userEmail, setUserEmail] = useState('')
   const [lastActive, setLastActive] = useState<string | null>(null)
   const router = useRouter()
@@ -26,19 +35,19 @@ export default function Dashboard() {
 
     const { data: family } = await supabase
       .from('families')
-      .select('parent_name, parent_whatsapp')
+      .select('id')
       .eq('adult_child_email', user.email)
       .single()
 
     if (!family) { router.push('/onboarding'); return }
 
-    setParentName(family.parent_name)
-    setParentWhatsapp(family.parent_whatsapp)
+    setFamilyId(family.id)
     setChecking(false)
 
     const res = await fetch('/api/recordings')
     const data = await res.json()
     if (data.recordings) setRecordings(data.recordings)
+    if (data.parents) setParents(data.parents)
     if (data.lastActive) setLastActive(data.lastActive)
     setLoading(false)
   }
@@ -54,6 +63,10 @@ export default function Dashboard() {
     ))
   }
 
+  function handleParentAdded(newParent: Parent) {
+    setParents(prev => [...prev, newParent])
+  }
+
   if (checking) {
     return (
       <main style={{ background: '#FDF8F3', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -65,12 +78,13 @@ export default function Dashboard() {
   return (
     <LayoutShell
       recordings={recordings}
-      parentName={parentName}
-      parentWhatsapp={parentWhatsapp}
+      parents={parents}
+      familyId={familyId}
       userEmail={userEmail}
       lastActive={lastActive}
       loading={loading}
       onMarkSeen={handleMarkSeen}
+      onParentAdded={handleParentAdded}
     />
   )
 }

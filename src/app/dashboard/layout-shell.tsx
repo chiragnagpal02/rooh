@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase";
 import { Recording } from "@/types";
+import { Parent } from "./page";
 import MemoriesView from "./views/memories";
 import ImportantInfoView from "./views/important-info";
 import PromptsView from "./views/prompts";
@@ -14,12 +15,13 @@ type View = "memories" | "info" | "prompts" | "family" | "settings";
 
 interface Props {
   recordings: Recording[];
-  parentName: string;
-  parentWhatsapp: string;
+  parents: Parent[];
+  familyId: string;
   userEmail: string;
   lastActive: string | null;
   loading: boolean;
   onMarkSeen: (id: string) => void;
+  onParentAdded: (parent: Parent) => void;
 }
 
 function formatLastActive(dateStr: string | null) {
@@ -27,9 +29,9 @@ function formatLastActive(dateStr: string | null) {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   if (diffMins < 60) return "just now";
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return "yesterday";
@@ -131,19 +133,39 @@ const VIEW_TITLES: Record<View, string> = {
 
 export default function LayoutShell({
   recordings,
-  parentName,
-  parentWhatsapp,
+  parents,
+  familyId,
   userEmail,
   lastActive,
   loading,
   onMarkSeen,
+  onParentAdded,
 }: Props) {
   const [view, setView] = useState<View>("memories");
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const router = useRouter();
   const supabase = createSupabaseBrowser();
   const newCount = recordings.filter((r) => (r as any).is_new).length;
+
+  // For topbar — derive a display name from parents
+  const archiveTitle =
+    parents.length === 0
+      ? "Your archive"
+      : parents.length === 1
+        ? `${parents[0].name}'s archive`
+        : parents.length === 2
+          ? `${parents[0].name} & ${parents[1].name}'s archive`
+          : "Family archive";
+
+  // Most recently active parent for status line
+  const mostRecentParent = parents.reduce(
+    (latest, p) => {
+      if (!p.last_active) return latest;
+      if (!latest?.last_active) return p;
+      return p.last_active > latest.last_active ? p : latest;
+    },
+    null as Parent | null,
+  );
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -154,21 +176,6 @@ export default function LayoutShell({
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#FDF8F3" }}>
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          onClick={() => setMobileOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            zIndex: 40,
-            display: "none",
-          }}
-          className="mobile-overlay"
-        />
-      )}
-
       {/* Sidebar */}
       <div
         style={{
@@ -359,7 +366,6 @@ export default function LayoutShell({
           }}
           className="topbar"
         >
-          {/* Title block - now with better spacing */}
           <div>
             <p
               style={{
@@ -373,7 +379,6 @@ export default function LayoutShell({
             >
               {VIEW_TITLES[view]}
             </p>
-
             <h1
               style={{
                 fontFamily: "Georgia, serif",
@@ -383,20 +388,12 @@ export default function LayoutShell({
                 margin: 0,
               }}
             >
-              {parentName}'s archive
+              {archiveTitle}
             </h1>
           </div>
 
-          {/* Status row - now on its own line for mobile breathing room */}
-          {lastActive && (
-            <div
-              className="status-row"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
+          {mostRecentParent && lastActive && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div
                 style={{
                   width: "7px",
@@ -406,7 +403,7 @@ export default function LayoutShell({
                 }}
               />
               <span style={{ fontSize: "12px", color: "#A8A29E" }}>
-                {parentName.split(" ")[0]} last recorded{" "}
+                {mostRecentParent.name.split(" ")[0]} last recorded{" "}
                 {formatLastActive(lastActive)}
               </span>
             </div>
@@ -427,7 +424,7 @@ export default function LayoutShell({
           {view === "memories" && (
             <MemoriesView
               recordings={recordings}
-              parentName={parentName}
+              parents={parents}
               loading={loading}
               onMarkSeen={onMarkSeen}
             />
@@ -436,8 +433,10 @@ export default function LayoutShell({
           {view === "prompts" && <PromptsView userEmail={userEmail} />}
           {view === "family" && (
             <FamilyView
-              parentName={parentName}
-              parentWhatsapp={parentWhatsapp}
+              familyId={familyId}
+              parents={parents}
+              userEmail={userEmail}
+              onParentAdded={onParentAdded}
             />
           )}
           {view === "settings" && <SettingsView userEmail={userEmail} />}

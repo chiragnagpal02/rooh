@@ -12,17 +12,31 @@ export async function GET() {
 
   const { data: family } = await supabaseAdmin
     .from('families')
-    .select('id, last_active')
+    .select('id')
     .eq('adult_child_email', user.email)
     .single()
 
   if (!family) {
-    return NextResponse.json({ recordings: [], lastActive: null })
+    return NextResponse.json({ recordings: [], parents: [], lastActive: null })
   }
+
+  // Fetch all parents for this family
+  const { data: parents } = await supabaseAdmin
+    .from('parents')
+    .select('*')
+    .eq('family_id', family.id)
+    .order('created_at', { ascending: true })
+
+  // Most recent last_active across all parents
+  const lastActive = parents?.reduce((latest, p) => {
+    if (!p.last_active) return latest
+    if (!latest) return p.last_active
+    return p.last_active > latest ? p.last_active : latest
+  }, null as string | null) ?? null
 
   const { data, error } = await supabaseAdmin
     .from('recordings')
-    .select('*')
+    .select('*, parents(name)')
     .eq('family_id', family.id)
     .order('created_at', { ascending: false })
 
@@ -38,7 +52,6 @@ export async function GET() {
 
   const seenIds = new Set((seenData || []).map(s => s.recording_id))
 
-  // Generate signed URLs and mark seen status
   const recordingsWithSignedUrls = await Promise.all(
     (data || []).map(async (recording) => {
       if (!recording.audio_url) return { ...recording, is_new: !seenIds.has(recording.id) }
@@ -60,6 +73,7 @@ export async function GET() {
 
   return NextResponse.json({
     recordings: recordingsWithSignedUrls,
-    lastActive: family.last_active
+    parents: parents || [],
+    lastActive,
   })
 }

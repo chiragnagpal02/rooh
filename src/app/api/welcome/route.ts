@@ -3,19 +3,21 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(req: NextRequest) {
   try {
-    const { family_id } = await req.json()
+    const { parent_id } = await req.json()
 
-    const { data: family } = await supabaseAdmin
-      .from('families')
-      .select('*')
-      .eq('id', family_id)
+    // Fetch parent + family in one query
+    const { data: parent } = await supabaseAdmin
+      .from('parents')
+      .select('*, families(*)')
+      .eq('id', parent_id)
       .single()
 
-    if (!family) {
-      return NextResponse.json({ error: 'Family not found' }, { status: 404 })
+    if (!parent) {
+      return NextResponse.json({ error: 'Parent not found' }, { status: 404 })
     }
 
-    const parentFirstName = family.parent_name.split(' ')[0]
+    const family = parent.families as any
+    const parentFirstName = parent.name.split(' ')[0]
     const adultFirstName = family.adult_child_name.split(' ')[0]
 
     const response = await fetch(
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: family.parent_whatsapp,
+          to: parent.whatsapp,
           type: 'template',
           template: {
             name: 'rooh_welcome',

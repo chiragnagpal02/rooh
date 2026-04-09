@@ -47,13 +47,12 @@ async function handleFinish() {
   setError('')
 
   try {
-    const { data: newFamily, error: insertError } = await supabase
+    // Step 1: Insert family (no parent fields anymore)
+    const { data: newFamily, error: familyError } = await supabase
       .from('families')
       .insert({
         adult_child_email: userEmail,
         adult_child_name: adultName,
-        parent_name: parentName,
-        parent_whatsapp: parentWhatsapp.replace(/\s/g, '').replace('+', ''),
         adult_child_whatsapp: adultWhatsapp
           ? adultWhatsapp.replace(/\s/g, '').replace('+', '')
           : null,
@@ -63,19 +62,39 @@ async function handleFinish() {
       .select()
       .single()
 
-    if (insertError) {
-      console.error('Insert error:', insertError)
-      // Show the actual error so we can see it
-      setError(`Error: ${insertError.message} (code: ${insertError.code})`)
+    if (familyError) {
+      setError(`Error: ${familyError.message} (code: ${familyError.code})`)
       setLoading(false)
       return
     }
 
-    if (newFamily) {
+    // Step 2: Insert parent into parents table
+    const { data: newParent, error: parentError } = await supabase
+      .from('parents')
+      .insert({
+        family_id: newFamily.id,
+        name: parentName,
+        whatsapp: parentWhatsapp.replace(/\s/g, '').replace('+', ''),
+      })
+      .select()
+      .single()
+
+    if (parentError) {
+      if (parentError.code === '23505') {
+        setError('This WhatsApp number is already connected to another account.')
+      } else {
+        setError(`Error: ${parentError.message} (code: ${parentError.code})`)
+      }
+      setLoading(false)
+      return
+    }
+
+    // Step 3: Send welcome message using parent_id
+    if (newParent) {
       await fetch('/api/welcome', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ family_id: newFamily.id })
+        body: JSON.stringify({ parent_id: newParent.id })
       })
     }
 
