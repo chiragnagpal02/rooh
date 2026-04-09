@@ -4,16 +4,42 @@ export interface Family {
   id: string
   adult_child_email: string
   adult_child_name: string
-  parent_name: string
-  parent_whatsapp: string
   created_at: string
+}
+
+export interface MedicalContact {
+  name: string
+  role: string
+  contact?: string
+  hospital?: string
+}
+
+export interface Medicine {
+  name: string
+  frequency?: string
+  dosage?: string
+  condition?: string
+}
+
+export interface Symptom {
+  description: string
+  duration?: string
+  severity?: string
+}
+
+export interface Appointment {
+  doctor: string
+  date?: string
+  reason?: string
 }
 
 export interface ExtractedEntities {
   insurance?: { provider: string; number: string; type: string }[]
   bank?: { name: string; branch: string; details: string }[]
-  medical?: { name: string; role: string; contact?: string }[]
-  medicines?: { name: string; frequency?: string }[]
+  medical?: MedicalContact[]
+  medicines?: Medicine[]
+  symptoms?: Symptom[]
+  appointments?: Appointment[]
   property?: { description: string; location: string }[]
   contacts?: { name: string; relation: string; number?: string }[]
 }
@@ -21,6 +47,7 @@ export interface ExtractedEntities {
 export interface Recording {
   id: string
   family_id: string
+  parent_id?: string
   audio_url: string | null
   language_detected: string | null
   transcript_original: string | null
@@ -28,7 +55,7 @@ export interface Recording {
   primary_type: RecordingType
   story_tags: string[]
   legacy_tags: string[]
-  extracted_entities: Record<string, any[]>
+  extracted_entities: ExtractedEntities
   classification_confidence: number
   needs_review: boolean
   created_at: string

@@ -8,7 +8,7 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(req: NextRequest) {
   try {
-    const { transcript, language, family_id } = await req.json()
+    const { transcript, language, family_id, parent_id } = await req.json()
 
     if (!transcript || !family_id) {
       return NextResponse.json(
@@ -17,7 +17,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Fetch family so we can notify
     const { data: family } = await supabaseAdmin
       .from('families')
       .select('*')
@@ -26,6 +25,25 @@ export async function POST(req: NextRequest) {
 
     if (!family) {
       return NextResponse.json({ error: 'Family not found' }, { status: 404 })
+    }
+
+    // Fetch parent name for notification
+    let parentName = 'Your parent'
+    if (parent_id) {
+      const { data: parent } = await supabaseAdmin
+        .from('parents')
+        .select('name')
+        .eq('id', parent_id)
+        .single()
+      if (parent) parentName = parent.name
+    } else {
+      const { data: firstParent } = await supabaseAdmin
+        .from('parents')
+        .select('name')
+        .eq('family_id', family_id)
+        .limit(1)
+        .single()
+      if (firstParent) parentName = firstParent.name
     }
 
     const classification = await classifyRecording(
@@ -37,6 +55,7 @@ export async function POST(req: NextRequest) {
       .from('recordings')
       .insert({
         family_id,
+        parent_id: parent_id || null,
         audio_url: null,
         language_detected: language || 'english',
         transcript_original: transcript,
@@ -56,7 +75,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Track
     const posthog = getPostHogClient()
     posthog.capture({
       distinctId: family_id,
@@ -70,8 +88,7 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Notify adult child — same logic as webhook
-    const notifResults = await notifyAdultChild(family, classification.primary_type)
+    const notifResults = await notifyAdultChild(parentName, family, classification.primary_type)
 
     return NextResponse.json({
       success: true,
@@ -86,12 +103,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-async function notifyAdultChild(family: any, recordingType: string) {
-  const parentFirstName = family.parent_name.split(' ')[0]
+async function notifyAdultChild(parentName: string, family: any, recordingType: string) {
+  const parentFirstName = parentName.split(' ')[0]
   const adultFirstName = family.adult_child_name.split(' ')[0]
   const results: { whatsapp?: string; email?: string } = {}
 
-  // WhatsApp
   if (family.notify_whatsapp && family.adult_child_whatsapp) {
     try {
       const response = await fetch(
@@ -131,7 +147,6 @@ async function notifyAdultChild(family: any, recordingType: string) {
       : 'skipped: notify_whatsapp is off'
   }
 
-  // Email
   if (family.notify_email && family.adult_child_email) {
     try {
       await resend.emails.send({
@@ -160,11 +175,9 @@ function getEmailHtml(adultName: string, parentName: string): string {
 <html>
 <body style="margin: 0; padding: 0; background: #FDF8F3; font-family: Georgia, serif;">
   <div style="max-width: 480px; margin: 40px auto; padding: 0 24px;">
-
     <div style="text-align: center; margin-bottom: 32px;">
       <p style="font-size: 28px; color: #1C1917; margin: 0; letter-spacing: 1px;">Rooh</p>
     </div>
-
     <div style="background: white; border: 0.5px solid #E8E0D5; border-radius: 16px; padding: 32px; text-align: center;">
       <div style="font-size: 32px; margin-bottom: 16px;">🙏</div>
       <h1 style="font-size: 22px; font-weight: 400; color: #1C1917; margin: 0 0 12px;">
@@ -179,12 +192,10 @@ function getEmailHtml(adultName: string, parentName: string): string {
         Open your archive
       </a>
     </div>
-
     <p style="text-align: center; font-size: 12px; color: #A8A29E; margin-top: 24px; font-family: sans-serif;">
       You're receiving this because you set up notifications in Rooh.
       <a href="https://rooh.family/dashboard" style="color: #A8A29E;">Manage settings</a>
     </p>
-
   </div>
 </body>
 </html>

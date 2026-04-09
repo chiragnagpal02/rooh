@@ -1,13 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { ClassificationResult } from '@/types'
+import Anthropic from "@anthropic-ai/sdk";
+import { ClassificationResult } from "@/types";
 
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!
-})
+  apiKey: process.env.ANTHROPIC_API_KEY!,
+});
 
 export async function classifyRecording(
   transcript: string,
-  language: string
+  language: string,
 ): Promise<ClassificationResult> {
   const prompt = `You are processing a voice recording for Rooh — a family memory archive app.
 An elderly parent sent this voice note to preserve their stories and information for their adult child.
@@ -24,8 +24,10 @@ Analyse this transcript and return a JSON object with exactly these fields:
   "extracted_entities": {
     "insurance": [{ "provider": "", "number": "", "type": "" }],
     "bank": [{ "name": "", "branch": "", "details": "" }],
-    "medical": [{ "name": "", "role": "", "contact": "" }],
-    "medicines": [{ "name": "", "frequency": "" }],
+    "medical": [{ "name": "", "role": "", "contact": "", "hospital": "" }],
+    "medicines": [{ "name": "", "frequency": "", "dosage": "", "condition": "" }],
+    "symptoms": [{ "description": "", "duration": "", "severity": "" }],
+    "appointments": [{ "doctor": "", "date": "", "reason": "" }],
     "property": [{ "description": "", "location": "" }],
     "contacts": [{ "name": "", "relation": "", "number": "" }]
   },
@@ -41,29 +43,31 @@ Rules:
 - primary_type is "untagged" only if the content is completely unclear
 - For legacy recordings, keep english_summary very brief — just note it is a personal message
 - Only populate extracted_entities fields that are actually mentioned — leave others as empty arrays
-- Return ONLY valid JSON, no extra text`
+- Return ONLY valid JSON, no extra text`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: "claude-sonnet-4-6",
     max_tokens: 1000,
-    messages: [{ role: 'user', content: prompt }]
-  })
+    messages: [{ role: "user", content: prompt }],
+  });
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : ''
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "";
 
   try {
-    const clean = text.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean) as ClassificationResult
+    const clean = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean) as ClassificationResult;
   } catch {
     // Fallback if parsing fails
     return {
-      primary_type: 'untagged',
+      primary_type: "untagged",
       story_tags: [],
       legacy_tags: [],
       extracted_entities: {},
-      english_summary: 'Recording saved. Could not be automatically classified.',
+      english_summary:
+        "Recording saved. Could not be automatically classified.",
       confidence: 0,
-      needs_review: true
-    }
+      needs_review: true,
+    };
   }
 }
