@@ -336,7 +336,7 @@ export default function LayoutShell({
                 <>
                   {/* Desktop */}
                   <div className="desktop-info">
-                    <InfoTooltip description={item.description} collapsed={collapsed} />
+                    <InfoTooltip description={item.description}/>
                   </div>
                   {/* Mobile */}
                   <button
