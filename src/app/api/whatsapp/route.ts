@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { transcribeAudio } from "@/lib/whisper";
 import { classifyRecording } from "@/lib/classify";
 import { sendWhatsAppMessage } from "@/lib/whatsapp";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -78,12 +81,12 @@ export async function POST(req: NextRequest) {
       needs_review: classification.needs_review,
     });
 
-    // Update last_active timestamp
     await supabaseAdmin
       .from("families")
       .update({ last_active: new Date().toISOString() })
       .eq("id", family.id);
 
+    // Confirmation message back to parent
     await sendWhatsAppMessage(
       from,
       getConfirmationMessage(family.parent_name, classification.primary_type),
@@ -93,11 +96,108 @@ export async function POST(req: NextRequest) {
       await sendWhatsAppMessage(from, classification.followup_prompt);
     }
 
+    // Notify adult child
+    await notifyAdultChild(family, classification.primary_type);
+
     return NextResponse.json({ status: "success" });
   } catch (err) {
     console.error("Webhook error:", err);
     return NextResponse.json({ status: "error" }, { status: 500 });
   }
+}
+
+async function notifyAdultChild(family: any, recordingType: string) {
+  const parentFirstName = family.parent_name.split(" ")[0];
+  const adultFirstName = family.adult_child_name.split(" ")[0];
+
+  // WhatsApp notification
+  if (family.notify_whatsapp && family.adult_child_whatsapp) {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.WHATSAPP_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: family.adult_child_whatsapp,
+            type: "template",
+            template: {
+              name: "rooh_notify_child",
+              language: { code: "en" },
+              components: [{
+                type: "body",
+                parameters: [
+                  { type: "text", text: adultFirstName },
+                  { type: "text", text: parentFirstName },
+                ],
+              }],
+            },
+          }),
+        }
+      );
+      if (!response.ok) {
+        const err = await response.json();
+        console.error("WhatsApp notify failed:", err);
+      }
+    } catch (err) {
+      console.error("WhatsApp notify error:", err);
+    }
+  }
+
+  // Email notification
+  if (family.notify_email && family.adult_child_email) {
+    try {
+      await resend.emails.send({
+        from: "Rooh <hello@rooh.family>",
+        to: family.adult_child_email,
+        subject: `${parentFirstName} just recorded a memory for you 🙏`,
+        html: getEmailHtml(adultFirstName, parentFirstName),
+      });
+    } catch (err) {
+      console.error("Email notify error:", err);
+    }
+  }
+}
+
+function getEmailHtml(adultName: string, parentName: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<body style="margin: 0; padding: 0; background: #FDF8F3; font-family: Georgia, serif;">
+  <div style="max-width: 480px; margin: 40px auto; padding: 0 24px;">
+
+    <div style="text-align: center; margin-bottom: 32px;">
+      <p style="font-size: 28px; color: #1C1917; margin: 0; letter-spacing: 1px;">Rooh</p>
+    </div>
+
+    <div style="background: white; border: 0.5px solid #E8E0D5; border-radius: 16px; padding: 32px; text-align: center;">
+      <div style="font-size: 32px; margin-bottom: 16px;">🙏</div>
+      <h1 style="font-size: 22px; font-weight: 400; color: #1C1917; margin: 0 0 12px;">
+        ${parentName} recorded a memory
+      </h1>
+      <p style="font-size: 15px; color: #57534E; line-height: 1.7; margin: 0 0 28px;">
+        Hi ${adultName}, ${parentName} just shared something with you on Rooh.
+        Open your archive to listen to it.
+      </p>
+      <a href="https://rooh.family/dashboard"
+        style="display: inline-block; padding: 14px 32px; background: #1C1917; color: #FDF8F3; text-decoration: none; border-radius: 10px; font-size: 15px; font-family: sans-serif;">
+        Open your archive
+      </a>
+    </div>
+
+    <p style="text-align: center; font-size: 12px; color: #A8A29E; margin-top: 24px; font-family: sans-serif;">
+      You're receiving this because you set up notifications in Rooh.
+      <a href="https://rooh.family/dashboard" style="color: #A8A29E;">Manage settings</a>
+    </p>
+
+  </div>
+</body>
+</html>
+  `;
 }
 
 async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
@@ -108,7 +208,6 @@ async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
   }
 
   try {
-    // Get download URL from Meta
     const metaRes = await fetch(`https://graph.facebook.com/v18.0/${audioId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -120,17 +219,12 @@ async function downloadMetaAudio(audioId: string): Promise<Buffer | null> {
       return null;
     }
 
-    // Download audio
     const audioRes = await fetch(meta.url, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!audioRes.ok) {
-      console.error(
-        "Audio download failed:",
-        audioRes.status,
-        audioRes.statusText,
-      );
+      console.error("Audio download failed:", audioRes.status, audioRes.statusText);
       return null;
     }
 
@@ -146,22 +240,10 @@ function getConfirmationMessage(parentName: string, type: string): string {
   const name = parentName.split(" ")[0];
 
   const messages: Record<string, string> = {
-    story:
-      "Thank you " +
-      name +
-      " \uD83D\uDE4F Your memory has been saved safely. Your family will treasure this.",
-    practical:
-      "Thank you " +
-      name +
-      ". That important information has been saved for your family.",
-    legacy:
-      "Thank you " +
-      name +
-      " \uD83D\uDE4F Your message has been saved with care, in your exact words.",
-    mixed:
-      "Thank you " +
-      name +
-      " \uD83D\uDE4F Your recording has been saved safely for your family.",
+    story: "Thank you " + name + " 🙏 Your memory has been saved safely. Your family will treasure this.",
+    practical: "Thank you " + name + ". That important information has been saved for your family.",
+    legacy: "Thank you " + name + " 🙏 Your message has been saved with care, in your exact words.",
+    mixed: "Thank you " + name + " 🙏 Your recording has been saved safely for your family.",
     untagged: "Thank you " + name + ". Your recording has been saved.",
   };
 
