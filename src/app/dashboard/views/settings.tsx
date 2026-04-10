@@ -222,6 +222,35 @@ export default function SettingsView({ userEmail }: Props) {
         </form>
       </div>
 
+      {/* Mobile sign out — only shown on mobile */}
+      <div className="mobile-signout-section" style={{ display: 'none' }}>
+        <button
+          onClick={async () => {
+            const supabase = createSupabaseBrowser()
+            await supabase.auth.signOut()
+            window.location.href = '/login'
+          }}
+          style={{
+            width: '100%', padding: '14px', background: 'white',
+            color: '#DC2626', border: '0.5px solid #FCA5A5',
+            borderRadius: '16px', fontSize: '14px', fontWeight: 500,
+            cursor: 'pointer', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '8px'
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Sign out
+        </button>
+      </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .mobile-signout-section { display: block !important; }
+        }
+      `}</style>
+
     </div>
   )
 }
