@@ -1,93 +1,131 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { createSupabaseBrowser } from '@/lib/supabase'
-import { Recording } from '@/types'
-import { useRouter } from 'next/navigation'
-import LayoutShell from './layout-shell'
+import { useEffect, useState } from "react";
+import { createSupabaseBrowser } from "@/lib/supabase";
+import { Recording } from "@/types";
+import { useRouter } from "next/navigation";
+import LayoutShell from "./layout-shell";
 
 export interface Parent {
-  id: string
-  family_id: string
-  name: string
-  whatsapp: string
-  created_at: string
-  last_active: string | null
+  id: string;
+  family_id: string;
+  name: string;
+  whatsapp: string;
+  created_at: string;
+  last_active: string | null;
 }
 
 export default function Dashboard() {
-  const [recordings, setRecordings] = useState<Recording[]>([])
-  const [parents, setParents] = useState<Parent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [checking, setChecking] = useState(true)
-  const [familyId, setFamilyId] = useState('')
-  const [userEmail, setUserEmail] = useState('')
-  const [adultName, setAdultName] = useState('')
-  const [lastActive, setLastActive] = useState<string | null>(null)
-  const router = useRouter()
-  const supabase = createSupabaseBrowser()
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [parents, setParents] = useState<Parent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(true);
+  const [familyId, setFamilyId] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [adultName, setAdultName] = useState("");
+  const [lastActive, setLastActive] = useState<string | null>(null);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
+  const [tourCompleted, setTourCompleted] = useState(false);
+  const router = useRouter();
+  const supabase = createSupabaseBrowser();
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   async function fetchData() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
-    setUserEmail(user.email || '')
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    setUserEmail(user.email || "");
 
     const { data: family } = await supabase
-      .from('families')
-      .select('id, adult_child_name')
-      .eq('adult_child_email', user.email)
-      .single()
+      .from("families")
+      .select(
+        "id, adult_child_name, is_pro, checklist_dismissed, tour_completed",
+      )
+      .eq("adult_child_email", user.email)
+      .single();
 
-    if (!family) { router.push('/onboarding'); return }
+    if (!family) {
+      router.push("/onboarding");
+      return;
+    }
 
-    setFamilyId(family.id)
-    setAdultName(family.adult_child_name)
-    setChecking(false)
+    setFamilyId(family.id);
+    setAdultName(family.adult_child_name);
+    setChecking(false);
+    setChecklistDismissed(family.checklist_dismissed ?? false);
+    setTourCompleted(family.tour_completed ?? false);
 
-    const res = await fetch('/api/recordings')
-    const data = await res.json()
-    if (data.recordings) setRecordings(data.recordings)
-    if (data.parents) setParents(data.parents)
-    if (data.lastActive) setLastActive(data.lastActive)
-    setLoading(false)
+    const res = await fetch("/api/recordings");
+    const data = await res.json();
+    if (data.recordings) setRecordings(data.recordings);
+    if (data.parents) setParents(data.parents);
+    if (data.lastActive) setLastActive(data.lastActive);
+    setLoading(false);
   }
 
+async function handleDismissChecklist() {
+  setChecklistDismissed(true)
+  await supabase.from('families').update({ checklist_dismissed: true }).eq('adult_child_email', userEmail)
+}
+
+async function handleCompleteTour() {
+  setTourCompleted(true)
+  await supabase.from('families').update({ tour_completed: true }).eq('adult_child_email', userEmail)
+}
+
   async function handleMarkSeen(recordingId: string) {
-    await fetch('/api/seen', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recording_id: recordingId })
-    })
-    setRecordings(prev => prev.map(r =>
-      r.id === recordingId ? { ...r, is_new: false } : r
-    ))
+    await fetch("/api/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recording_id: recordingId }),
+    });
+    setRecordings((prev) =>
+      prev.map((r) => (r.id === recordingId ? { ...r, is_new: false } : r)),
+    );
   }
 
   function handleParentAdded(newParent: Parent) {
-    setParents(prev => [...prev, newParent])
+    setParents((prev) => [...prev, newParent]);
   }
 
   if (checking) {
     return (
-      <main style={{ background: '#FDF8F3', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ fontSize: '14px', color: '#A8A29E' }}>Loading...</p>
+      <main
+        style={{
+          background: "#FDF8F3",
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <p style={{ fontSize: "14px", color: "#A8A29E" }}>Loading...</p>
       </main>
-    )
+    );
   }
 
-  return (
-    <LayoutShell
-      recordings={recordings}
-      parents={parents}
-      familyId={familyId}
-      userEmail={userEmail}
-      adultName={adultName}
-      lastActive={lastActive}
-      loading={loading}
-      onMarkSeen={handleMarkSeen}
-      onParentAdded={handleParentAdded}
-    />
-  )
-}
+return (
+  <LayoutShell
+    recordings={recordings}
+    parents={parents}
+    familyId={familyId}
+    userEmail={userEmail}
+    adultName={adultName}
+    lastActive={lastActive}
+    loading={loading}
+    checklistDismissed={checklistDismissed}
+    tourCompleted={tourCompleted}
+    onMarkSeen={handleMarkSeen}
+    onParentAdded={handleParentAdded}
+    onDismissChecklist={handleDismissChecklist}
+    onCompleteTour={handleCompleteTour}
+  />
+ )
+};
